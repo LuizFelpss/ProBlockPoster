@@ -1,0 +1,6 @@
+# O repositório guarda LF. O build roda em Linux na Vercel, e sem isto o Windows
+# introduziria CRLF em cada arquivo tocado, poluindo os diffs.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary

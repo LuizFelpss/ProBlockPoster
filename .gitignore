@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.vite
+coverage
+*.tsbuildinfo
+
+# Documento de skill de terceiros, usado durante o desenvolvimento.
+# O frontmatter remete a um LICENSE.txt que não acompanha o arquivo, então ele
+# fica fora do repositório. Remova esta linha se os termos permitirem publicá-lo.
+SKILL.md

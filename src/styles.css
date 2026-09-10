@@ -1,0 +1,310 @@
+@import 'tailwindcss';
+
+/*
+  Identidade: registro de impressão.
+  O problema central do produto — folhas que precisam ser alinhadas — é o problema de
+  registro de uma impressora. Daí as duas tintas: azul de chapa e rosa flúor de
+  risografia, sobre papel. O rosa aparece só onde há registro a acertar (faixas de
+  sobreposição, foco do recorte, estado ativo). Todo o resto fica quieto.
+*/
+@theme {
+  --color-tinta: #1b3bb3;
+  --color-tinta-escura: #101f5c;
+  --color-tinta-clara: #4d6ae0;
+  --color-registro: #ff4d9d;
+  --color-papel: #ffffff;
+  --color-mesa: #d9dbd5;
+  --color-mesa-funda: #c4c7c0;
+  --color-grafite: #14203f;
+
+  --font-display: 'Bricolage Grotesque', 'Trebuchet MS', sans-serif;
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-mesa);
+    color: var(--color-grafite);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Medidas são dados tabulares: alinham em coluna sem precisar de monoespaçada. */
+  .numero {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-registro);
+    outline-offset: 2px;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+@layer components {
+  /* --- Ficha de impressão (painel de tinta) --- */
+
+  .ficha-legenda {
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: color-mix(in srgb, white 62%, var(--color-tinta));
+  }
+
+  /* Campos como linhas de formulário carimbado, não como caixas flutuantes. */
+  .campo {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    border-bottom: 1.5px solid color-mix(in srgb, white 35%, transparent);
+    padding: 0.35rem 0 0.3rem;
+    color: white;
+    font-size: 1rem;
+    transition: border-color 120ms ease;
+  }
+
+  .campo:hover {
+    border-bottom-color: color-mix(in srgb, white 60%, transparent);
+  }
+
+  .campo:focus {
+    border-bottom-color: var(--color-registro);
+    outline: none;
+  }
+
+  .campo option {
+    color: var(--color-grafite);
+  }
+
+  /* Grupo segmentado: as opções ficam lado a lado como abas de um seletor mecânico. */
+  .segmento {
+    display: flex;
+    gap: 1px;
+    background: color-mix(in srgb, white 22%, transparent);
+    padding: 1px;
+    border-radius: 3px;
+  }
+
+  .segmento button {
+    flex: 1;
+    border: 0;
+    padding: 0.4rem 0.3rem;
+    background: transparent;
+    color: color-mix(in srgb, white 78%, var(--color-tinta));
+    font-size: 0.875rem;
+    cursor: pointer;
+    border-radius: 2px;
+    transition:
+      background 120ms ease,
+      color 120ms ease;
+  }
+
+  .segmento button:hover {
+    background: color-mix(in srgb, white 15%, transparent);
+    color: white;
+  }
+
+  .segmento button[aria-pressed='true'] {
+    background: white;
+    color: var(--color-tinta-escura);
+    font-weight: 600;
+  }
+
+  .chip {
+    border: 1.5px solid color-mix(in srgb, white 35%, transparent);
+    background: transparent;
+    color: color-mix(in srgb, white 82%, var(--color-tinta));
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition:
+      border-color 120ms ease,
+      background 120ms ease;
+  }
+
+  .chip:hover {
+    border-color: white;
+    color: white;
+  }
+
+  .chip[aria-pressed='true'] {
+    background: var(--color-registro);
+    border-color: var(--color-registro);
+    color: white;
+    font-weight: 600;
+  }
+
+  /* Range nativo: já vem com teclado e leitor de tela, só recebe a cor da casa. */
+  .deslizante {
+    width: 100%;
+    margin-top: 0.35rem;
+    accent-color: var(--color-registro);
+    cursor: pointer;
+  }
+
+  .interruptor {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    padding: 0.15rem 0;
+  }
+
+  .interruptor input {
+    appearance: none;
+    width: 1.05rem;
+    height: 1.05rem;
+    border: 1.5px solid color-mix(in srgb, white 45%, transparent);
+    border-radius: 2px;
+    cursor: pointer;
+    flex: none;
+    transition: background 120ms ease;
+  }
+
+  .interruptor input:checked {
+    background: var(--color-registro);
+    border-color: var(--color-registro);
+  }
+
+  .interruptor input:checked::after {
+    content: '';
+    display: block;
+    width: 0.28rem;
+    height: 0.55rem;
+    margin: 0.05rem 0 0 0.3rem;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  /* --- Folhas de papel no palco --- */
+
+  .folha {
+    background: var(--color-papel);
+    overflow: hidden;
+    position: relative;
+    /* Papel tem canto vivo e sombra curta e direcional — não é um card. */
+    box-shadow: 0 1px 2px rgb(16 31 92 / 0.28);
+  }
+
+  /*
+    A emenda é a informação principal do preview: sem ela o usuário não vê onde uma
+    folha termina e a outra começa. Some sobre imagem saturada se ficar sutil demais,
+    então vai de contorno cheio, não de sombra.
+  */
+  .folha-emenda {
+    /* Fio claro por dentro, fio escuro por fora: legível sobre imagem clara ou escura. */
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.9),
+      inset 0 0 0 2px rgb(20 32 63 / 0.6),
+      0 1px 2px rgb(16 31 92 / 0.28);
+  }
+
+  .folha-numero {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    padding: 0.1rem 0.28rem;
+    font-size: 0.625rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    background: white;
+    color: var(--color-tinta-escura);
+  }
+
+  /* A faixa repetida entre folhas: a única coisa na tela que grita. */
+  .registro {
+    position: absolute;
+    background: color-mix(in srgb, var(--color-registro) 24%, transparent);
+    pointer-events: none;
+  }
+
+  /* Um fio cheio na borda interna garante que a faixa apareça sobre qualquer imagem. */
+  .registro-vertical {
+    border-left: 1.5px solid var(--color-registro);
+    border-right: 1.5px solid var(--color-registro);
+  }
+
+  .registro-horizontal {
+    border-top: 1.5px solid var(--color-registro);
+    border-bottom: 1.5px solid var(--color-registro);
+  }
+
+  .botao-gerar {
+    width: 100%;
+    border: 0;
+    background: var(--color-registro);
+    color: white;
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    padding: 0.8rem 1rem;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: transform 90ms ease, background 120ms ease;
+  }
+
+  .botao-gerar:hover:not(:disabled) {
+    background: #ff2f8c;
+  }
+
+  .botao-gerar:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .botao-gerar:disabled {
+    background: color-mix(in srgb, white 30%, var(--color-tinta));
+    cursor: not-allowed;
+  }
+
+  .aviso {
+    border-left: 3px solid currentColor;
+    padding: 0.5rem 0 0.5rem 0.6rem;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+}
+
+/*
+  Um único momento de movimento: as folhas assentam na grade quando a configuração muda.
+  Nada de entradas em cascata por seção nem transição em todo hover.
+*/
+@keyframes assentar {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.assenta {
+  animation: assentar 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assenta {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+  }
+}
