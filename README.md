@@ -28,6 +28,7 @@ src/
 │   ├── fit.ts       modos Preencher / Ajustar
 │   ├── tiles.ts     regiões de origem de cada folha
 │   ├── quality.ts   resolução efetiva, largura saudável, limites de canvas
+│   ├── deblock.ts   detecção e remoção de artefato de compressão
 │   ├── resample.ts  reamostragem Lanczos
 │   └── sharpen.ts   máscara de nitidez para impressão
 ├── services/
@@ -110,6 +111,19 @@ vizinhos que existiriam na imagem inteira, e a diferença apareceria exatamente 
 folhas se encontram na parede. Por isso `services/enhance.ts` extrai cada folha com
 sangria, filtra e só então descarta a sangria. Verificado: a coluna da emenda fica
 idêntica ao render da imagem inteira, contra 37 níveis de diferença sem sangria.
+
+**"Baixa qualidade" são dois problemas, e eles pedem coisas opostas.** Imagem pequena é
+falta de pixels, e para isso serve a reamostragem. Imagem muito comprimida tem degraus nas
+fronteiras dos blocos de 8 × 8 do JPEG, e ampliar só os torna maiores no papel — um bloco
+ampliado 3 vezes vira 3 mm de quadrado na parede. `core/deblock.ts` mede a blocagem uma
+vez na imagem inteira e, acima do limiar, suaviza só os pixels encostados nas fronteiras,
+e só onde os dois lados já estão lisos. Uma borda real que caia sobre a fronteira é
+deixada em paz. Medido: blocagem no pôster de 2,67 para 2,25, ao custo de 1,4% de
+acutância.
+
+**A medição é uma por imagem, não uma por folha.** Um trecho de céu liso e um trecho com
+detalhe mediriam blocagens diferentes, receberiam forças diferentes, e a diferença
+apareceria exatamente na emenda entre as duas folhas.
 
 **O alerta de qualidade não mente sobre a melhoria.** O dpi exibido continua saindo dos
 pixels originais. Um número que subisse por causa do filtro transformaria o único

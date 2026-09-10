@@ -1,3 +1,5 @@
+import { medirBlocagem } from '../core/deblock';
+
 /** Carregamento e validação da imagem enviada (req. 3.1, 4.1, 4.2). */
 
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -15,6 +17,14 @@ export interface LoadedImage {
   /** Cópia reduzida usada pelo preview — a original nunca vai para a tela (req. 4.1). */
   preview: ImageBitmap;
   fileName: string;
+  /**
+   * Quanto a imagem sofre de blocagem de JPEG (item 14.1.3).
+   *
+   * Medido uma vez, na imagem inteira. Medir por folha faria folhas vizinhas receberem
+   * tratamentos diferentes — um trecho de céu liso mediria diferente de um trecho com
+   * detalhe —, e a diferença apareceria exatamente na emenda.
+   */
+  blocagem: number;
 }
 
 export class ImageError extends Error {}
@@ -79,10 +89,36 @@ export async function loadImage(file: File): Promise<LoadedImage> {
   return {
     bitmap,
     preview,
+    blocagem: await medirBlocagemDaImagem(bitmap),
     width: bitmap.width,
     height: bitmap.height,
     fileName: sanitizeFileName(file.name),
   };
+}
+
+/** Lado da amostra usada para medir blocagem. */
+const AMOSTRA_PX = 512;
+
+/**
+ * Mede a blocagem numa amostra central, em escala 1:1.
+ *
+ * Precisa ser 1:1 porque os blocos têm 8 pixels de lado: qualquer redução os apagaria.
+ * A amostra começa num múltiplo de 8 para que a grade caia na fase esperada.
+ */
+async function medirBlocagemDaImagem(bitmap: ImageBitmap): Promise<number> {
+  const largura = Math.min(AMOSTRA_PX, bitmap.width);
+  const altura = Math.min(AMOSTRA_PX, bitmap.height);
+  const x0 = Math.floor((bitmap.width - largura) / 2 / 8) * 8;
+  const y0 = Math.floor((bitmap.height - altura) / 2 / 8) * 8;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = largura;
+  canvas.height = altura;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) return 1;
+
+  ctx.drawImage(bitmap, x0, y0, largura, altura, 0, 0, largura, altura);
+  return medirBlocagem(ctx.getImageData(0, 0, largura, altura).data, largura, altura);
 }
 
 async function buildPreview(bitmap: ImageBitmap): Promise<ImageBitmap> {

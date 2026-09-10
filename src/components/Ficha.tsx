@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Config } from '../config';
 import { ALTURA_MAXIMA_CM, LARGURA_MAXIMA_CM, MARGEM_MAXIMA_MM } from '../config';
+import { forcaParaBlocagem } from '../core/deblock';
 import { melhorEncaixe, type AlvoDeTamanho, type Encaixe } from '../core/layout';
 import { MIN_MARGIN_MM, OVERLAP_OPTIONS_MM, PAPERS, PAPER_IDS } from '../core/paper';
 import {
@@ -24,7 +25,7 @@ interface FichaProps {
   layout: PosterLayout;
   projection: Projection;
   quality: QualityReport;
-  image: Size;
+  image: Size & { blocagem: number };
   imageUrl: string;
   focus: Focus;
   onFocus: (focus: Focus) => void;
@@ -54,6 +55,8 @@ export default function Ficha(props: FichaProps) {
     altura: Math.max(10, config.alturaCm * 10),
   };
   const encaixe = melhorEncaixe(alvo, { margin: layout.margin, overlap: layout.overlap });
+
+  const compressaoDetectada = forcaParaBlocagem(props.image.blocagem) > 0;
 
   const larguraSaudavel = larguraParaDpi(props.projection, layout.poster.width);
   // Um pôster não pode ser menor que a área imprimível de uma folha.
@@ -368,6 +371,18 @@ export default function Ficha(props: FichaProps) {
             ? 'Usa Lanczos no lugar do filtro do navegador e compensa o borrão de tinta e papel. Deixa a geração mais lenta.'
             : 'A ampliação fica por conta do filtro interno do navegador, mais rápido e mais mole.'}
         </p>
+
+        {/*
+          O app não age em silêncio: se detectou compressão e vai filtrar, diz. E se a
+          melhoria está desligada, diz que o problema existe e não será tratado.
+        */}
+        {compressaoDetectada && (
+          <p className="ficha-legenda mt-2 border-l-2 border-white/30 pl-2">
+            {config.enhance
+              ? 'Esta imagem tem marcas de compressão forte. Os blocos de 8 × 8 do JPEG serão suavizados antes da ampliação, senão virariam quadrados de alguns milímetros no papel.'
+              : 'Esta imagem tem marcas de compressão forte. Com a melhoria desligada, os blocos do JPEG vão para o papel ampliados como estão.'}
+          </p>
+        )}
       </Bloco>
 
       {quality.level !== 'adequada' && (

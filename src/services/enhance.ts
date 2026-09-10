@@ -1,3 +1,4 @@
+import { LADO_DO_BLOCO, forcaParaBlocagem, removerBlocagem } from '../core/deblock';
 import { redimensionarLanczos } from '../core/resample';
 import { NITIDEZ_PARA_IMPRESSAO, mascaraDeNitidez, type OpcoesNitidez } from '../core/sharpen';
 import type { Rect, Size } from '../core/types';
@@ -28,6 +29,8 @@ export function melhorarFolha(
   alturaSaida: number,
   criarSuperficie: FabricaDeSuperficie,
   nitidez: OpcoesNitidez = NITIDEZ_PARA_IMPRESSAO,
+  /** Blocagem medida na imagem inteira; zero desliga o filtro de artefato. */
+  blocagem: number = 1,
 ): ImageData {
   const escalaX = larguraSaida / origem.width;
   const escalaY = alturaSaida / origem.height;
@@ -58,7 +61,29 @@ export function melhorarFolha(
     larguraOrigem,
     alturaOrigem,
   );
-  const dadosOrigem = extracao.ctx.getImageData(0, 0, larguraOrigem, alturaOrigem).data;
+  let dadosOrigem: Uint8ClampedArray = extracao.ctx.getImageData(
+    0,
+    0,
+    larguraOrigem,
+    alturaOrigem,
+  ).data;
+
+  /*
+    A blocagem é removida aqui, na resolução original, porque é só nela que a grade de
+    8 × 8 existe. Depois da ampliação os degraus já viraram rampas de vários pixels e não
+    há mais fronteira para reconhecer.
+
+    A sangria entra nesta conta de graça: ela tem pelo menos 3 pixels, então os pixels
+    que sobrevivem ao recorte foram filtrados com os vizinhos completos.
+  */
+  const forca = forcaParaBlocagem(blocagem);
+  if (forca > 0) {
+    // O recorte quase nunca começa alinhado ao bloco; a fase diz onde cai a primeira
+    // fronteira dentro deste buffer.
+    const faseX = (LADO_DO_BLOCO - (x0 % LADO_DO_BLOCO)) % LADO_DO_BLOCO;
+    const faseY = (LADO_DO_BLOCO - (y0 % LADO_DO_BLOCO)) % LADO_DO_BLOCO;
+    dadosOrigem = removerBlocagem(dadosOrigem, larguraOrigem, alturaOrigem, faseX, faseY, forca);
+  }
 
   const larguraExpandida = Math.max(1, Math.round(larguraOrigem * escalaX));
   const alturaExpandida = Math.max(1, Math.round(alturaOrigem * escalaY));

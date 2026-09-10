@@ -16,6 +16,8 @@ export interface PdfOptions {
   enhance: boolean;
   /** Dimensões da imagem original, necessárias para a sangria da melhoria. */
   imageSize: { width: number; height: number };
+  /** Blocagem de JPEG medida na imagem inteira (item 14.1.3). */
+  blocagem: number;
 }
 
 export interface PdfProgress {
@@ -133,6 +135,8 @@ export async function generatePoster(
           larguraSaida,
           alturaSaida,
           criarSuperficie,
+          undefined,
+          options.blocagem,
         );
         ctx.putImageData(melhorada, x0, y0);
       } else {

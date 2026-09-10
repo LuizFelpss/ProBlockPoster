@@ -162,6 +162,7 @@ export default function App() {
           fileName: image.fileName,
           enhance: config.enhance,
           imageSize: { width: image.width, height: image.height },
+          blocagem: image.blocagem,
         },
         setProgresso,
       );
