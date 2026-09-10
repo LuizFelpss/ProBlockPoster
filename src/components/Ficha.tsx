@@ -16,6 +16,7 @@ import type { Orientation, PaperId, PosterLayout, Projection, Size } from '../co
 import type { QualityReport } from '../core/quality';
 import type { PdfProgress } from '../services/pdf';
 import { formatBytes } from '../services/image';
+import CampoNumero from './CampoNumero';
 import MapaRecorte from './MapaRecorte';
 import type { Focus } from '../core/types';
 
@@ -158,49 +159,32 @@ export default function Ficha(props: FichaProps) {
         </div>
 
         {config.modo === 'largura' ? (
-          <label className="mt-3 block">
-            <span className="ficha-legenda">Largura final, em centímetros</span>
-            <input
-              type="number"
-              className="campo numero"
-              min={5}
-              max={LARGURA_MAXIMA_CM}
-              step={1}
-              value={config.larguraCm}
-              onChange={(e) => ajustar({ larguraCm: Number(e.target.value) })}
-            />
-            <span className="ficha-legenda mt-1 block">
-              A altura sai da proporção da imagem. O sistema arredonda para a grade mais
-              próxima e mostra a largura real abaixo.
-            </span>
-          </label>
+          <CampoNumero
+            className="mt-3 block"
+            rotulo="Largura final, em centímetros"
+            valor={config.larguraCm}
+            aoMudar={(larguraCm) => ajustar({ larguraCm })}
+            min={5}
+            max={LARGURA_MAXIMA_CM}
+            legenda="A altura sai da proporção da imagem. O sistema arredonda para a grade mais próxima e mostra a largura real abaixo."
+          />
         ) : config.modo === 'tamanho' ? (
           <>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <label>
-                <span className="ficha-legenda">Largura, em cm</span>
-                <input
-                  type="number"
-                  className="campo numero"
-                  min={1}
-                  max={LARGURA_MAXIMA_CM}
-                  step={1}
-                  value={config.larguraCm}
-                  onChange={(e) => ajustar({ larguraCm: Number(e.target.value) })}
-                />
-              </label>
-              <label>
-                <span className="ficha-legenda">Altura, em cm</span>
-                <input
-                  type="number"
-                  className="campo numero"
-                  min={1}
-                  max={ALTURA_MAXIMA_CM}
-                  step={1}
-                  value={config.alturaCm}
-                  onChange={(e) => ajustar({ alturaCm: Number(e.target.value) })}
-                />
-              </label>
+              <CampoNumero
+                rotulo="Largura, em cm"
+                valor={config.larguraCm}
+                aoMudar={(larguraCm) => ajustar({ larguraCm })}
+                min={1}
+                max={LARGURA_MAXIMA_CM}
+              />
+              <CampoNumero
+                rotulo="Altura, em cm"
+                valor={config.alturaCm}
+                aoMudar={(alturaCm) => ajustar({ alturaCm })}
+                min={1}
+                max={ALTURA_MAXIMA_CM}
+              />
             </div>
             <p className="ficha-legenda mt-2">
               Aqui a proporção é sua, não da imagem. A imagem se acomoda pelo
@@ -217,55 +201,36 @@ export default function Ficha(props: FichaProps) {
           </>
         ) : (
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <label>
-              <span className="ficha-legenda">Colunas</span>
-              <input
-                type="number"
-                className="campo numero"
-                min={1}
-                max={40}
-                value={config.cols}
-                onChange={(e) => ajustar({ cols: Math.max(1, Math.round(Number(e.target.value))) })}
-              />
-            </label>
-            <label>
-              <span className="ficha-legenda">Linhas</span>
-              <input
-                type="number"
-                className="campo numero"
-                min={1}
-                max={40}
-                value={config.rows}
-                onChange={(e) => ajustar({ rows: Math.max(1, Math.round(Number(e.target.value))) })}
-              />
-            </label>
+            <CampoNumero
+              rotulo="Colunas"
+              valor={config.cols}
+              aoMudar={(cols) => ajustar({ cols })}
+              min={1}
+              max={40}
+              inteiro
+            />
+            <CampoNumero
+              rotulo="Linhas"
+              valor={config.rows}
+              aoMudar={(rows) => ajustar({ rows })}
+              min={1}
+              max={40}
+              inteiro
+            />
           </div>
         )}
       </Bloco>
 
       <Bloco titulo="Impressão">
-        <label className="block">
-          <span className="ficha-legenda">
-            Margem, em milímetros — mínimo {MIN_MARGIN_MM}, porque impressoras não imprimem
-            até a borda
-          </span>
-          <input
-            type="number"
-            className="campo numero"
-            min={MIN_MARGIN_MM}
-            max={MARGEM_MAXIMA_MM}
-            step={1}
-            value={config.margin}
-            onChange={(e) =>
-              ajustar({
-                margin: Math.min(
-                  MARGEM_MAXIMA_MM,
-                  Math.max(MIN_MARGIN_MM, Number(e.target.value) || MIN_MARGIN_MM),
-                ),
-              })
-            }
-          />
-        </label>
+        <CampoNumero
+          className="block"
+          rotulo={`Margem, em milímetros — mínimo ${MIN_MARGIN_MM}, porque impressoras não imprimem até a borda`}
+          valor={config.margin}
+          aoMudar={(margin) => ajustar({ margin })}
+          min={MIN_MARGIN_MM}
+          max={MARGEM_MAXIMA_MM}
+          inteiro
+        />
 
         <fieldset className="mt-4">
           <legend className="ficha-legenda">Sobreposição entre folhas, em milímetros</legend>

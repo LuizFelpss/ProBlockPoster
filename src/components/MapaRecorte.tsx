@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ZOOM_MAXIMO, ZOOM_MINIMO } from '../core/fit';
 import type { FitMode, Focus, Projection, Size } from '../core/types';
 
@@ -34,6 +34,26 @@ export default function MapaRecorte({
 }: MapaRecorteProps) {
   const caixa = useRef<HTMLDivElement>(null);
   const descricaoId = useId();
+
+  /*
+    No celular o mapa ficava no meio do painel capturando todo o toque, e sobrava
+    apenas uma faixa estreita de painel para rolar até o botão de gerar. Agora o
+    arrasto por toque é uma escolha explícita: por padrão o dedo rola a página.
+    Com mouse não existe esse conflito, então lá o arrasto continua sempre ativo.
+  */
+  const [arrastandoPorToque, setArrastandoPorToque] = useState(false);
+  const [ponteiroGrosso, setPonteiroGrosso] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const consulta = window.matchMedia('(pointer: coarse)');
+    const atualizar = () => setPonteiroGrosso(consulta.matches);
+    atualizar();
+    consulta.addEventListener('change', atualizar);
+    return () => consulta.removeEventListener('change', atualizar);
+  }, []);
+
+  const aceitaArrasto = (tipo: string) => tipo !== 'touch' || arrastandoPorToque;
   const { source } = projection;
 
   const fracaoLargura = source.width / image.width;
@@ -56,12 +76,18 @@ export default function MapaRecorte({
     });
   }
 
+  useEffect(() => {
+    if (!arrastavel) setArrastandoPorToque(false);
+  }, [arrastavel]);
+
   const descricao =
     fit === 'ajustar'
       ? 'A imagem inteira entra no pôster. Sobra papel em branco nas laterais.'
-      : recortaAlgo
-        ? 'A área clara entra no pôster. Arraste o mapa ou use os controles abaixo.'
-        : 'A imagem tem a mesma proporção da grade: nada é descartado.';
+      : !recortaAlgo
+        ? 'A imagem tem a mesma proporção da grade: nada é descartado.'
+        : ponteiroGrosso
+          ? 'A área clara entra no pôster. Use os controles abaixo, ou toque em ajustar para arrastar o recorte no mapa.'
+          : 'A área clara entra no pôster. Arraste o mapa ou use os controles abaixo.';
 
   return (
     <div>
@@ -70,17 +96,20 @@ export default function MapaRecorte({
         role="img"
         aria-label={`Mapa do recorte. ${Math.round(fracaoLargura * fracaoAltura * 100)} por cento da imagem entra no pôster.`}
         onPointerDown={(e) => {
-          if (!arrastavel) return;
+          if (!arrastavel || !aceitaArrasto(e.pointerType)) return;
           e.currentTarget.setPointerCapture(e.pointerId);
           mover(e.clientX, e.clientY);
         }}
         onPointerMove={(e) => {
-          if (e.buttons === 1) mover(e.clientX, e.clientY);
+          if (e.buttons === 1 && aceitaArrasto(e.pointerType)) mover(e.clientX, e.clientY);
         }}
-        className="relative w-full touch-none overflow-hidden bg-tinta-escura/40"
+        className="relative w-full overflow-hidden bg-tinta-escura/40"
         style={{
           aspectRatio: `${image.width} / ${image.height}`,
           cursor: arrastavel ? 'grab' : 'default',
+          // Só sequestra o toque enquanto o ajuste está ligado. Fora disso o dedo
+          // rola a página normalmente por cima do mapa.
+          touchAction: arrastandoPorToque ? 'none' : 'pan-y',
         }}
       >
         <img
@@ -117,6 +146,24 @@ export default function MapaRecorte({
       <p id={descricaoId} className="ficha-legenda mt-2">
         {descricao}
       </p>
+
+      {arrastavel && ponteiroGrosso && (
+        <button
+          type="button"
+          aria-pressed={arrastandoPorToque}
+          onClick={() => setArrastandoPorToque((ligado) => !ligado)}
+          className="mt-2 w-full rounded-sm border border-white/40 px-3 py-2 text-sm"
+          style={
+            arrastandoPorToque
+              ? { background: 'var(--color-registro)', borderColor: 'var(--color-registro)' }
+              : undefined
+          }
+        >
+          {arrastandoPorToque
+            ? 'Concluir ajuste e voltar a rolar'
+            : 'Ajustar o recorte arrastando'}
+        </button>
+      )}
 
       {fit === 'preencher' && (
         <div className="mt-3 space-y-2">
