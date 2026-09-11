@@ -12,10 +12,12 @@ import {
   larguraParaDpi,
   maxRenderDpi,
 } from '../core/quality';
-import type { Orientation, PaperId, PosterLayout, Projection, Size } from '../core/types';
+import { TEMPLATES, alvoDoTemplate, templateDoAlvo } from '../core/templates';
+import type { Melhoria, Orientation, PaperId, PosterLayout, Projection, Size } from '../core/types';
 import type { QualityReport } from '../core/quality';
 import type { PdfProgress } from '../services/pdf';
 import { formatBytes } from '../services/image';
+import { BYTES_DA_REDE, redeDisponivel } from '../services/superres';
 import CampoNumero from './CampoNumero';
 import MapaRecorte from './MapaRecorte';
 import type { Focus } from '../core/types';
@@ -56,8 +58,17 @@ export default function Ficha(props: FichaProps) {
     altura: Math.max(10, config.alturaCm * 10),
   };
   const encaixe = melhorEncaixe(alvo, { margin: layout.margin, overlap: layout.overlap });
+  // Só faz sentido marcar um atalho como ativo no modo em que ele manda: nos outros
+  // o tamanho não vem mais da largura e da altura pedidas.
+  const templateAtivo = config.modo === 'tamanho' ? templateDoAlvo(alvo, props.image) : null;
 
   const compressaoDetectada = forcaParaBlocagem(props.image.blocagem) > 0;
+  /*
+    A rede só é oferecida onde há WebGPU. Em CPU a mesma inferência leva cerca de 37
+    segundos por megapixel de origem — uma folha passaria de um minuto, e o usuário não
+    teria como prever isso antes de esperar.
+  */
+  const temRede = redeDisponivel();
 
   const larguraSaudavel = larguraParaDpi(props.projection, layout.poster.width);
   // Um pôster não pode ser menor que a área imprimível de uma folha.
@@ -157,6 +168,50 @@ export default function Ficha(props: FichaProps) {
             Folhas
           </button>
         </div>
+
+        {/*
+          Atalhos para os tamanhos que as pessoas realmente pedem. Sem eles, quem quer um
+          A0 precisa saber que A0 tem 84,1 × 118,9 cm — e quem não sabe acaba digitando um
+          número redondo qualquer.
+        */}
+        <fieldset className="mt-3">
+          <legend className="ficha-legenda">Tamanhos prontos</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {TEMPLATES.map((template) => {
+              const alvoDele = alvoDoTemplate(template, props.image);
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  className="chip"
+                  aria-pressed={templateAtivo?.id === template.id}
+                  aria-label={`${template.rotulo}, ${formatPar(alvoDele.largura, alvoDele.altura)}: ${template.nota}`}
+                  onClick={() =>
+                    ajustar({
+                      modo: 'tamanho',
+                      larguraCm: alvoDele.largura / 10,
+                      alturaCm: alvoDele.altura / 10,
+                    })
+                  }
+                >
+                  {template.rotulo}
+                </button>
+              );
+            })}
+          </div>
+          <p className="ficha-legenda mt-2">
+            {templateAtivo ? (
+              <>
+                {templateAtivo.rotulo} em{' '}
+                {props.image.width > props.image.height ? 'paisagem' : 'retrato'},{' '}
+                {templateAtivo.nota}:{' '}
+                <span className="numero">{formatPar(alvo.largura, alvo.altura)}</span>.
+              </>
+            ) : (
+              'Cada atalho já vem na orientação da sua imagem e preenche largura e altura.'
+            )}
+          </p>
+        </fieldset>
 
         {config.modo === 'largura' ? (
           <CampoNumero
@@ -322,20 +377,35 @@ export default function Ficha(props: FichaProps) {
             />
             <span className="text-sm">Numeração das folhas</span>
           </label>
-          <label className="interruptor">
-            <input
-              type="checkbox"
-              checked={config.enhance}
-              onChange={(e) => ajustar({ enhance: e.target.checked })}
-            />
-            <span className="text-sm">Melhorar a ampliação e dar nitidez de impressão</span>
-          </label>
         </div>
-        <p className="ficha-legenda mt-2">
-          {config.enhance
-            ? 'Usa Lanczos no lugar do filtro do navegador e compensa o borrão de tinta e papel. Deixa a geração mais lenta.'
-            : 'A ampliação fica por conta do filtro interno do navegador, mais rápido e mais mole.'}
-        </p>
+
+        <label className="mt-4 block">
+          <span className="ficha-legenda">Como ampliar a imagem</span>
+          <select
+            className="campo"
+            value={config.melhoria}
+            onChange={(e) => ajustar({ melhoria: e.target.value as Melhoria })}
+          >
+            <option value="navegador">Filtro do navegador — mais rápido</option>
+            <option value="lanczos">Lanczos e nitidez — recomendado</option>
+            <option value="rede" disabled={!temRede}>
+              Rede neural{temRede ? '' : ' — precisa de WebGPU'}
+            </option>
+          </select>
+        </label>
+        <p className="ficha-legenda mt-2">{LEGENDA_DA_MELHORIA[config.melhoria]}</p>
+
+        {/*
+          A rede custa download e tempo, e os dois precisam ser ditos antes de o usuário
+          clicar em gerar — descobrir depois é o mesmo que não ter sido avisado.
+        */}
+        {config.melhoria === 'rede' && (
+          <p className="ficha-legenda mt-2 border-l-2 border-registro pl-2">
+            Baixa cerca de <span className="numero">{formatBytes(BYTES_DA_REDE)}</span> na
+            primeira vez e leva alguns segundos por folha. O modelo roda na sua máquina: a
+            imagem continua sem sair do navegador.
+          </p>
+        )}
 
         {/*
           O app não age em silêncio: se detectou compressão e vai filtrar, diz. E se a
@@ -343,9 +413,12 @@ export default function Ficha(props: FichaProps) {
         */}
         {compressaoDetectada && (
           <p className="ficha-legenda mt-2 border-l-2 border-white/30 pl-2">
-            {config.enhance
-              ? 'Esta imagem tem marcas de compressão forte. Os blocos de 8 × 8 do JPEG serão suavizados antes da ampliação, senão virariam quadrados de alguns milímetros no papel.'
-              : 'Esta imagem tem marcas de compressão forte. Com a melhoria desligada, os blocos do JPEG vão para o papel ampliados como estão.'}
+            {config.melhoria === 'lanczos' &&
+              'Esta imagem tem marcas de compressão forte. Os blocos de 8 × 8 do JPEG serão suavizados antes da ampliação, senão virariam quadrados de alguns milímetros no papel.'}
+            {config.melhoria === 'rede' &&
+              'Esta imagem tem marcas de compressão forte. A rede foi treinada sobre imagens comprimidas e desfaz os blocos por conta própria, então o filtro de blocagem sai do caminho.'}
+            {config.melhoria === 'navegador' &&
+              'Esta imagem tem marcas de compressão forte. Com o filtro do navegador, os blocos do JPEG vão para o papel ampliados como estão.'}
           </p>
         )}
       </Bloco>
@@ -409,7 +482,9 @@ export default function Ficha(props: FichaProps) {
           disabled={gerando}
         >
           {gerando && progresso
-            ? `Gerando folha ${progresso.done} de ${progresso.total}…`
+            ? `Gerando folha ${progresso.done + 1} de ${progresso.total}${
+                progresso.etapa ? ` — ${progresso.etapa}` : '…'
+              }`
             : 'Gerar PDF'}
         </button>
         <p className="ficha-legenda mt-2 text-center">
@@ -502,3 +577,10 @@ function Bloco({ titulo, children }: { titulo: string; children: ReactNode }) {
     </section>
   );
 }
+
+const LEGENDA_DA_MELHORIA: Record<Melhoria, string> = {
+  navegador: 'A ampliação fica por conta do filtro interno do navegador, mais rápido e mais mole.',
+  lanczos:
+    'Usa Lanczos no lugar do filtro do navegador e compensa o borrão de tinta e papel. Deixa a geração mais lenta.',
+  rede: 'Uma rede de super-resolução refaz os pixels que faltam. Limpa marcas de compressão melhor que o resto, mas alisa textura fina — em foto pequena e comprimida ganha; em imagem já boa, não.',
+};

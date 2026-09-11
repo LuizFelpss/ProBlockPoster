@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import type { PosterLayout, Tile } from '../core/types';
+import type { Melhoria, PosterLayout, Tile } from '../core/types';
 import { tileLabel } from '../core/tiles';
 import { melhorarFolha } from './enhance';
 
@@ -12,8 +12,8 @@ export interface PdfOptions {
   pageLabels: boolean;
   coverSheet: boolean;
   fileName: string;
-  /** Lanczos + máscara de nitidez no lugar da interpolação do navegador (item 14.1). */
-  enhance: boolean;
+  /** Com que filtro a imagem é ampliada até o dpi de impressão (item 14.1). */
+  melhoria: Melhoria;
   /** Dimensões da imagem original, necessárias para a sangria da melhoria. */
   imageSize: { width: number; height: number };
   /** Blocagem de JPEG medida na imagem inteira (item 14.1.3). */
@@ -23,6 +23,11 @@ export interface PdfOptions {
 export interface PdfProgress {
   done: number;
   total: number;
+  /**
+   * O que está acontecendo dentro da folha atual, quando isso demora o bastante para a
+   * barra parecer travada. A ampliação por rede neural leva segundos por folha.
+   */
+  etapa?: string;
 }
 
 /**
@@ -127,16 +132,26 @@ export async function generatePoster(
       const larguraSaida = Math.round((tile.dest.x + tile.dest.width) * pxPerMm) - x0;
       const alturaSaida = Math.round((tile.dest.y + tile.dest.height) * pxPerMm) - y0;
 
-      if (options.enhance) {
-        const melhorada = melhorarFolha(
+      if (options.melhoria !== 'navegador') {
+        const melhorada = await melhorarFolha(
           bitmap,
           tile.source,
           options.imageSize,
           larguraSaida,
           alturaSaida,
           criarSuperficie,
-          undefined,
-          options.blocagem,
+          {
+            melhoria: options.melhoria,
+            blocagem: options.blocagem,
+            // A rede leva segundos por folha; sem este detalhe a barra fica parada e o
+            // usuário não tem como saber se travou.
+            aoProgredir: (feitos, totalDeRetalhos) =>
+              onProgress?.({
+                done,
+                total,
+                etapa: `ampliando ${feitos}/${totalDeRetalhos}`,
+              }),
+          },
         );
         ctx.putImageData(melhorada, x0, y0);
       } else {

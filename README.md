@@ -28,12 +28,15 @@ src/
 │   ├── fit.ts       modos Preencher / Ajustar
 │   ├── tiles.ts     regiões de origem de cada folha
 │   ├── quality.ts   resolução efetiva, largura saudável, limites de canvas
+│   ├── templates.ts tamanhos de pôster prontos
+│   ├── superres.ts  geometria dos retalhos da rede neural
 │   ├── deblock.ts   detecção e remoção de artefato de compressão
 │   ├── resample.ts  reamostragem Lanczos
 │   └── sharpen.ts   máscara de nitidez para impressão
 ├── services/
 │   ├── image.ts     validação, orientação EXIF, preview reduzido
 │   ├── enhance.ts   Lanczos e nitidez por folha, com sangria nas emendas
+│   ├── superres.ts  ampliação por rede neural (ONNX Runtime, WebGPU)
 │   ├── pdf.ts       montagem do PDF (carregado sob demanda)
 │   └── posterPdf.ts escolhe entre worker e thread principal, e entrega o arquivo
 ├── workers/
@@ -80,6 +83,14 @@ por 40 para ganhar 1% de precisão.
 pedida quase nunca é atingível. Arredondar para cima levaria 60 cm pedidos a 77 cm — o
 sistema arredonda para a grade mais próxima e mostra a largura real.
 
+**Um tamanho pronto guarda lado maior e lado menor, não largura e altura.** A
+orientação de um A0 não é propriedade do papel A0, é da imagem que vai ocupá-lo: quem
+escolhe A0 com uma foto deitada quer um A0 deitado. Guardar o par fixo obrigaria a
+interface a girá-lo depois, que é a mesma decisão tomada num lugar pior. E o atalho não
+troca o papel sozinho — quem faz isso é a recomendação de encaixe, que já existia e
+aparece logo abaixo com o número de folhas de cada opção. Trocar em silêncio o papel que
+o usuário escolheu seria pior que recomendar.
+
 **Nunca existe um canvas do tamanho do pôster.** O Safari limita a área total de um
 canvas a cerca de 16,7 milhões de pixels e o Chrome limita cada lado a 65.535 px. Cada
 folha é renderizada no seu próprio canvas e descartada em seguida.
@@ -97,6 +108,36 @@ principal cai de 189 ms para 25 ms quando o worker está disponível.
 **O zoom do recorte derruba o dpi efetivo, e o aviso acompanha.** Ampliar significa cobrir
 o mesmo pôster com menos pixels de origem. O alerta de resolução é calculado sobre a área
 realmente usada, então ele reage ao zoom sem nenhum código extra.
+
+**A rede neural é uma opção, não o padrão — e por medição, não por cautela.** Degradando
+uma referência e ampliando de volta, o Lanczos ganha em PSNR (27,8 contra 26,7): a rede é
+um modelo GAN e troca fidelidade por detalhe inventado. Numa origem *comprimida*, que é o
+caso real de quem tem imagem ruim, ela vira a melhor opção: acutância 15,3 contra 14,7 e
+blocagem 1,05 contra 1,18 — inclusive em imagens cuja blocagem o detector do app nem
+acusa. Em compensação alisa textura fina, e numa imagem já boa isso é perda. O texto na
+ficha diz exatamente isso, porque a escolha depende da imagem e quem a conhece é o
+usuário.
+
+**A rede exige WebGPU.** O mesmo modelo roda em wasm na CPU, e foi medido: cerca de 37
+segundos por megapixel de origem, o que passaria de um minuto por folha. Onde não há
+WebGPU a opção aparece desabilitada, dizendo por quê — e não escondida, que faria a
+ausência parecer defeito.
+
+**O halo de 34 pixels da rede não foi deduzido, foi medido.** A arquitetura tem 34
+convoluções 3 × 3 em sequência, o que dá um campo receptivo de 34 px. A verificação
+variou a sangria e comparou o miolo contra a mesma região processada num contexto maior:
+com 34 px a diferença é 0, com 32 px é 0,0005 nível, e sem sangria chega a 15,5 níveis —
+que seria uma faixa visível exatamente na emenda entre duas folhas.
+
+**Com a rede ligada, o filtro de blocagem sai do caminho.** Num recorte a JPEG de
+qualidade 5, com blocagem 2,58 na origem, a rede sozinha entrega 1,08 — o mesmo que
+deblock + rede, com a mesma acutância. Ela foi treinada sobre imagens comprimidas; somar
+os dois filtros seria pagar duas vezes pelo mesmo resultado.
+
+**Os pesos são versionados, não baixados no build.** São 4,87 MB em `public/modelos/`,
+com procedência e sha256 registrados ao lado. Buscá-los de um host de terceiros no build
+deixaria o produto refém da disponibilidade alheia, e servi-los da própria origem é o que
+mantém o `connect-src 'self'` e a promessa de que a imagem não sai da máquina.
 
 **A imagem já era ampliada antes de existir `core/resample.ts`.** Quando a folha sai a
 200 dpi e a origem tem 90, o `drawImage` interpola de qualquer jeito. A escolha nunca foi

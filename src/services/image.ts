@@ -50,7 +50,8 @@ function startsWith2(bytes: Uint8Array, offset: number, ascii: string): boolean 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  // Vírgula decimal, como em todo número exibido no app.
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
 }
 
 export async function loadImage(file: File): Promise<LoadedImage> {

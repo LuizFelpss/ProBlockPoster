@@ -52,6 +52,6 @@ describe('formatBytes', () => {
   it('escolhe a unidade legível', () => {
     expect(formatBytes(512)).toBe('512 B');
     expect(formatBytes(2048)).toBe('2 kB');
-    expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MB');
+    expect(formatBytes(5 * 1024 * 1024)).toBe('5,0 MB');
   });
 });

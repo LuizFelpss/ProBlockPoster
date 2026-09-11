@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "jspdf": "^4.2.1",
+    "onnxruntime-web": "^1.29.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

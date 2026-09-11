@@ -1,6 +1,6 @@
 import { DEFAULT_MARGIN_MM, DEFAULT_OVERLAP_MM } from './core/paper';
 import { DEFAULT_RENDER_DPI } from './core/quality';
-import type { FitMode, Orientation, PaperId } from './core/types';
+import type { FitMode, Melhoria, Orientation, PaperId } from './core/types';
 
 /** Modo de entrada do tamanho do pôster (req. 3.2). */
 export type ModoTamanho = 'largura' | 'tamanho' | 'grade';
@@ -22,8 +22,8 @@ export interface Config {
   cropMarks: boolean;
   pageLabels: boolean;
   coverSheet: boolean;
-  /** Lanczos + nitidez no lugar da interpolação do navegador (item 14.1). */
-  enhance: boolean;
+  /** Com que filtro a imagem é ampliada até o dpi de impressão (item 14.1). */
+  melhoria: Melhoria;
 }
 
 export const CONFIG_PADRAO: Config = {
@@ -41,7 +41,7 @@ export const CONFIG_PADRAO: Config = {
   cropMarks: true,
   pageLabels: true,
   coverSheet: true,
-  enhance: true,
+  melhoria: 'lanczos',
 };
 
 export const MARGEM_MAXIMA_MM = 25;

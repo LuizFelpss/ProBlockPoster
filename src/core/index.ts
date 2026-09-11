@@ -4,3 +4,5 @@ export * from './layout';
 export * from './fit';
 export * from './tiles';
 export * from './quality';
+export * from './templates';
+export * from './superres';

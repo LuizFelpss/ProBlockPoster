@@ -1,11 +1,13 @@
 import { LADO_DO_BLOCO, forcaParaBlocagem, removerBlocagem } from '../core/deblock';
 import { redimensionarLanczos } from '../core/resample';
 import { NITIDEZ_PARA_IMPRESSAO, mascaraDeNitidez, type OpcoesNitidez } from '../core/sharpen';
-import type { Rect, Size } from '../core/types';
+import { HALO_DA_REDE } from '../core/superres';
+import type { Melhoria, Rect, Size } from '../core/types';
 import type { FabricaDeSuperficie } from './pdf';
 
 /**
- * Aplica Lanczos e máscara de nitidez a uma folha (item 14.1.2 dos requisitos).
+ * Aplica o filtro escolhido a uma folha: Lanczos e máscara de nitidez (item 14.1.2), ou
+ * uma passada de rede neural antes disso (item 14.1.4).
  *
  * O ponto delicado é a emenda. Convolução aplicada folha a folha produz resultado
  * diferente nas bordas, porque o filtro não encontra vizinhos além do limite do
@@ -21,22 +23,53 @@ const LOBOS = 3;
 /** Abaixo desta diferença de escala, reamostrar é trabalho jogado fora. */
 const TOLERANCIA_DE_ESCALA = 0.02;
 
-export function melhorarFolha(
+/**
+ * Abaixo desta ampliação a rede neural não é chamada.
+ *
+ * Ela amplia 4× fixos. Quando a folha já sai reduzida — imagem grande num pôster
+ * pequeno —, ampliar 4× para depois reduzir 8× custaria dezenas de segundos por folha
+ * para entregar menos detalhe do que simplesmente reduzir com Lanczos.
+ */
+const AMPLIACAO_MINIMA_PARA_REDE = 1.05;
+
+export interface OpcoesDeMelhoria {
+  melhoria: Melhoria;
+  nitidez?: OpcoesNitidez;
+  /** Blocagem medida na imagem inteira; zero desliga o filtro de artefato. */
+  blocagem?: number;
+  aoProgredir?: (feitos: number, total: number) => void;
+}
+
+export async function melhorarFolha(
   bitmap: ImageBitmap,
   origem: Rect,
   imagem: Size,
   larguraSaida: number,
   alturaSaida: number,
   criarSuperficie: FabricaDeSuperficie,
-  nitidez: OpcoesNitidez = NITIDEZ_PARA_IMPRESSAO,
-  /** Blocagem medida na imagem inteira; zero desliga o filtro de artefato. */
-  blocagem: number = 1,
-): ImageData {
+  opcoes: OpcoesDeMelhoria,
+): Promise<ImageData> {
+  const nitidez = opcoes.nitidez ?? NITIDEZ_PARA_IMPRESSAO;
+  const blocagem = opcoes.blocagem ?? 1;
+
   const escalaX = larguraSaida / origem.width;
   const escalaY = alturaSaida / origem.height;
 
-  const sangriaX = sangriaEmPixelsDeOrigem(escalaX, nitidez.raio);
-  const sangriaY = sangriaEmPixelsDeOrigem(escalaY, nitidez.raio);
+  /*
+    A rede só entra quando a folha realmente amplia. E quando entra, a sangria cresce:
+    ela precisa dos 34 px de campo receptivo (`HALO_DA_REDE`) **somados** ao que Lanczos
+    e nitidez já pediam, porque as três convoluções acontecem em sequência e cada uma
+    consome vizinhança da anterior. Somar é folgado de propósito — a conta exata
+    economizaria alguns pixels por folha e custaria a garantia de emenda invisível, que
+    é o motivo de este arquivo existir.
+  */
+  const usarRede =
+    opcoes.melhoria === 'rede' &&
+    Math.min(escalaX, escalaY) >= AMPLIACAO_MINIMA_PARA_REDE;
+
+  const haloDaRede = usarRede ? HALO_DA_REDE : 0;
+  const sangriaX = haloDaRede + sangriaEmPixelsDeOrigem(escalaX, nitidez.raio);
+  const sangriaY = haloDaRede + sangriaEmPixelsDeOrigem(escalaY, nitidez.raio);
 
   // Região expandida, presa aos limites da imagem: nas bordas do pôster não há
   // vizinho para pegar, e aí a sangria simplesmente é menor.
@@ -76,7 +109,15 @@ export function melhorarFolha(
     A sangria entra nesta conta de graça: ela tem pelo menos 3 pixels, então os pixels
     que sobrevivem ao recorte foram filtrados com os vizinhos completos.
   */
-  const forca = forcaParaBlocagem(blocagem);
+  /*
+    Com a rede ligada o filtro de blocagem sai do caminho. Não é economia de tempo: é
+    que ele vira redundante. Medido num recorte comprimido a JPEG de qualidade 5, com
+    blocagem 2,58 na origem, a rede sozinha entrega blocagem 1,08 — o mesmo valor que
+    deblock + rede, e com a mesma acutância (13,93 contra 13,97). A rede foi treinada
+    justamente sobre imagens comprimidas; o filtro anterior existe para o caminho em que
+    ela não roda.
+  */
+  const forca = usarRede ? 0 : forcaParaBlocagem(blocagem);
   if (forca > 0) {
     // O recorte quase nunca começa alinhado ao bloco; a fase diz onde cai a primeira
     // fronteira dentro deste buffer.
@@ -85,21 +126,45 @@ export function melhorarFolha(
     dadosOrigem = removerBlocagem(dadosOrigem, larguraOrigem, alturaOrigem, faseX, faseY, forca);
   }
 
+  /*
+    Passada da rede: ela amplia 4× fixos sobre os pixels originais, e o Lanczos logo
+    abaixo acerta o que falta para a escala real da folha — que quase nunca é 4. Fazer o
+    contrário (Lanczos primeiro, rede depois) daria à rede pixels já interpolados, que é
+    o oposto do que ela foi treinada para receber.
+  */
+  let larguraFiltrada = larguraOrigem;
+  let alturaFiltrada = alturaOrigem;
+
+  if (usarRede) {
+    const { ampliarComRede } = await import('./superres');
+    const ampliada = await ampliarComRede(
+      dadosOrigem,
+      larguraOrigem,
+      alturaOrigem,
+      opcoes.aoProgredir,
+    );
+    dadosOrigem = ampliada.dados;
+    larguraFiltrada = ampliada.largura;
+    alturaFiltrada = ampliada.altura;
+  }
+
   const larguraExpandida = Math.max(1, Math.round(larguraOrigem * escalaX));
   const alturaExpandida = Math.max(1, Math.round(alturaOrigem * escalaY));
 
+  const escalaRestanteX = larguraExpandida / larguraFiltrada;
+  const escalaRestanteY = alturaExpandida / alturaFiltrada;
   const semMudancaDeEscala =
-    Math.abs(escalaX - 1) < TOLERANCIA_DE_ESCALA &&
-    Math.abs(escalaY - 1) < TOLERANCIA_DE_ESCALA &&
-    larguraExpandida === larguraOrigem &&
-    alturaExpandida === alturaOrigem;
+    Math.abs(escalaRestanteX - 1) < TOLERANCIA_DE_ESCALA &&
+    Math.abs(escalaRestanteY - 1) < TOLERANCIA_DE_ESCALA &&
+    larguraExpandida === larguraFiltrada &&
+    alturaExpandida === alturaFiltrada;
 
   const redimensionada = semMudancaDeEscala
     ? dadosOrigem
     : redimensionarLanczos(
         dadosOrigem,
-        larguraOrigem,
-        alturaOrigem,
+        larguraFiltrada,
+        alturaFiltrada,
         larguraExpandida,
         alturaExpandida,
         LOBOS,

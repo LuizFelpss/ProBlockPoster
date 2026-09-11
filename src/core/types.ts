@@ -6,6 +6,16 @@ export type Orientation = 'retrato' | 'paisagem';
 /** Como a imagem se acomoda na área do pôster quando as proporções não batem (req. 3.4). */
 export type FitMode = 'preencher' | 'ajustar';
 
+/**
+ * Com que filtro a imagem é ampliada até o dpi de impressão (item 14.1).
+ *
+ * `navegador` deixa a interpolação interna do `drawImage` decidir; `lanczos` usa o
+ * filtro do `core/` com máscara de nitidez; `rede` passa por uma rede neural de
+ * super-resolução antes disso. Nenhum dos três muda o dpi efetivo exibido — ele
+ * continua saindo dos pixels originais.
+ */
+export type Melhoria = 'navegador' | 'lanczos' | 'rede';
+
 export interface Size {
   width: number;
   height: number;

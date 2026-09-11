@@ -11,6 +11,7 @@ import { buildTiles } from './core/tiles';
 import type { Focus } from './core/types';
 import { ImageError, loadImage, type LoadedImage } from './services/image';
 import type { PdfProgress } from './services/pdf';
+import { MARCA_DE_ERRO_DA_REDE } from './services/superres';
 
 const CENTRO: Focus = { x: 0.5, y: 0.5 };
 
@@ -94,13 +95,21 @@ export default function App() {
         : (fn: () => void) => setTimeout(fn, 300);
     const id = agendar(() => {
       void import('./services/posterPdf').then((m) => m.prepararWorker());
+      /*
+        O modelo tem 4,9 MB e o runtime tem mais, e compilar tudo isso no clique em
+        "Gerar PDF" faria a espera parecer travamento. Só é buscado quando a rede é a
+        escolha vigente: quem nunca liga a opção nunca paga o download.
+      */
+      if (config.melhoria === 'rede') {
+        void import('./services/superres').then((m) => m.prepararRede());
+      }
     });
     return () => {
       if (typeof cancelIdleCallback === 'function' && typeof id === 'number') {
         cancelIdleCallback(id);
       }
     };
-  }, [image]);
+  }, [image, config.melhoria]);
 
   const calculo = useMemo(() => {
     if (!image) return null;
@@ -160,7 +169,7 @@ export default function App() {
           pageLabels: config.pageLabels,
           coverSheet: config.coverSheet,
           fileName: image.fileName,
-          enhance: config.enhance,
+          melhoria: config.melhoria,
           imageSize: { width: image.width, height: image.height },
           blocagem: image.blocagem,
         },
@@ -168,9 +177,18 @@ export default function App() {
       );
       downloadBlob(blob, `${image.fileName}-poster.pdf`);
     } catch (e) {
+      const detalhe = e instanceof Error ? e.message : 'erro desconhecido';
+      /*
+        Culpar a memória por uma falha de download do modelo mandaria o usuário reduzir o
+        pôster sem necessidade. Quando a causa é a rede neural, a saída é outra: trocar o
+        modo de ampliação, que não custa nada e gera o mesmo pôster.
+      */
       setErroPdf(
-        'A geração falhou, provavelmente por falta de memória. Tente uma resolução menor ' +
-          `ou menos folhas. (${e instanceof Error ? e.message : 'erro desconhecido'})`,
+        detalhe.includes(MARCA_DE_ERRO_DA_REDE)
+          ? 'A ampliação por rede neural não pôde ser carregada, e nenhuma folha foi ' +
+              `gerada. Troque "Como ampliar a imagem" para Lanczos e gere de novo. (${detalhe})`
+          : 'A geração falhou, provavelmente por falta de memória. Tente uma resolução menor ' +
+              `ou menos folhas. (${detalhe})`,
       );
     } finally {
       setGerando(false);
@@ -290,14 +308,12 @@ function Rodape({ largura, altura, folhas, colunas, linhas, sobreposicao, alvo }
           lineHeight: 1,
         }}
       >
-        {(largura / 10).toFixed(1).replace('.', ',')} × {(altura / 10).toFixed(1).replace('.', ',')}{' '}
-        cm
+        {cm(largura)} × {cm(altura)} cm
         <span className="ml-3 text-base font-normal text-grafite/70">
           {folhas} folhas em {colunas} × {linhas}
           {alvo && desvio > 0 && (
             <>
-              , pedido {(alvo.largura / 10).toFixed(0)} × {(alvo.altura / 10).toFixed(0)} cm com{' '}
-              {desvio}% de desvio
+              , pedido {cm(alvo.largura)} × {cm(alvo.altura)} cm com {desvio}% de desvio
             </>
           )}
         </span>
@@ -314,4 +330,13 @@ function Rodape({ largura, altura, folhas, colunas, linhas, sobreposicao, alvo }
       </ol>
     </footer>
   );
+}
+
+/*
+  Uma casa decimal em todo número de centímetro do rodapé. Os tamanhos prontos trouxeram
+  alvos quebrados — A1 são 84,1 cm —, e arredondar só o pedido faria o rodapé dizer
+  "pedido 84 cm" ao lado de um campo escrito 84,1.
+*/
+function cm(mm: number): string {
+  return (mm / 10).toFixed(1).replace('.', ',');
 }
