@@ -63,6 +63,15 @@ tamanho inatingível na prática.
 
 ### Decisões que não são óbvias
 
+**A sobreposição vira aba de cola, não arte repetida.** A folha avança `sX` mas ocupa
+`uW`: a diferença é a faixa que as vizinhas dividem. Se as duas imprimissem arte ali, quem
+recortasse pelas marcas de corte e encostasse as folhas veria a imagem repetida em `o` mm
+de emenda — letras ganhando traços a mais. Por isso `buildTiles()` deixa esses `o` mm em
+branco na borda esquerda de quem não é da primeira coluna e no topo de quem não é da
+primeira linha. A arte reparte o pôster sem lacuna nem repetição, e a faixa branca entra
+por baixo da vizinha na montagem. A primeira coluna e a primeira linha encostam na borda do
+pôster e não sacrificam milímetro nenhum.
+
 **Margem mínima de 5 mm.** Impressoras domésticas têm uma faixa não imprimível de 3 a
 6 mm em cada borda. Permitir margem 0 produziria folhas com falhas.
 

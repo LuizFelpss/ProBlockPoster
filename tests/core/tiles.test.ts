@@ -66,9 +66,52 @@ describe('buildTiles', () => {
   });
 
   it('as regiões de origem avançam na mesma proporção das folhas', () => {
+    // A folha 0 não tem aba, então sua largura de origem cobre a área útil inteira.
     const pxPorMm = tiles[0].source!.width / layout.usable.width;
-    const avancoEsperado = layout.step.x * pxPorMm;
+    // A folha 1 começa onde a 0 termina: o avanço é a área útil, não o passo da grade,
+    // porque a aba de cola já comeu a sobreposição.
+    const avancoEsperado = layout.usable.width * pxPorMm;
     expect(tiles[1].source!.x - tiles[0].source!.x).toBeCloseTo(avancoEsperado, 6);
+  });
+
+  it('a aba de cola só existe onde há folha vizinha atrás', () => {
+    expect(tiles[0].aba).toEqual({ x: 0, y: 0 });
+    expect(tiles[1].aba).toEqual({ x: settings.overlap, y: 0 });
+    expect(tiles[3].aba).toEqual({ x: 0, y: settings.overlap });
+    expect(tiles[4].aba).toEqual({ x: settings.overlap, y: settings.overlap });
+  });
+
+  it('sem sobreposição nenhuma folha reserva aba', () => {
+    const semSobra = computeLayout({ ...settings, overlap: 0 });
+    const semSobraTiles = buildTiles(semSobra, project(image, semSobra.poster, 'preencher'));
+    expect(semSobraTiles.every((t) => t.aba.x === 0 && t.aba.y === 0)).toBe(true);
+  });
+
+  it('a arte das folhas reparte o pôster sem repetir nem deixar lacuna', () => {
+    // O defeito que a aba resolve: com a arte indo até a borda dos dois lados, recortar
+    // pelas marcas e encostar as folhas imprimia a mesma faixa duas vezes.
+    const arte = (i: number) => ({
+      x: tiles[i].posterRect.x + tiles[i].dest!.x,
+      y: tiles[i].posterRect.y + tiles[i].dest!.y,
+      width: tiles[i].dest!.width,
+      height: tiles[i].dest!.height,
+    });
+
+    for (let row = 0; row < layout.rows; row++) {
+      for (let col = 1; col < layout.cols; col++) {
+        const esquerda = arte(row * layout.cols + col - 1);
+        const direita = arte(row * layout.cols + col);
+        expect(direita.x).toBeCloseTo(esquerda.x + esquerda.width, 10);
+      }
+    }
+
+    for (let row = 1; row < layout.rows; row++) {
+      for (let col = 0; col < layout.cols; col++) {
+        const acima = arte((row - 1) * layout.cols + col);
+        const abaixo = arte(row * layout.cols + col);
+        expect(abaixo.y).toBeCloseTo(acima.y + acima.height, 10);
+      }
+    }
   });
 
   it('no modo ajustar, folhas fora da imagem ficam em branco', () => {

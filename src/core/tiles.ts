@@ -3,12 +3,18 @@ import type { PosterLayout, Projection, Rect, Tile } from './types';
 /**
  * Divide o pôster em folhas (req. 3.6).
  *
- * Cada folha ocupa uma janela `uW × uH` do pôster, avançando `sX`/`sY` — o que é
- * menor que a janela sempre que há sobreposição, e é justamente essa diferença que
- * produz a faixa repetida usada para alinhar as folhas na montagem.
+ * Cada folha ocupa uma janela `uW × uH` do pôster, avançando `sX`/`sY` — o que é menor
+ * que a janela sempre que há sobreposição.
  *
- * A região de origem sai da interseção entre a janela da folha e o retângulo onde a
- * imagem foi projetada. No modo "ajustar" a interseção pode ser vazia: a folha é
+ * Essa diferença vira uma **aba de cola**: na borda esquerda de toda folha que não é da
+ * primeira coluna, e no topo de toda folha que não é da primeira linha, os `o` mm
+ * iniciais saem em branco. A arte que cairia ali já está impressa na folha vizinha, de
+ * modo que nada aparece duas vezes no papel — a aba entra por baixo da vizinha e some.
+ * Sem ela, quem recortasse pelas marcas de corte e encostasse as folhas veria a imagem
+ * repetida em `o` mm de emenda, com letras ganhando traços a mais.
+ *
+ * A região de origem sai da interseção entre a área de arte da folha e o retângulo onde
+ * a imagem foi projetada. No modo "ajustar" a interseção pode ser vazia: a folha é
  * branca e `source` vem como `null`.
  */
 export function buildTiles(layout: PosterLayout, projection: Projection): Tile[] {
@@ -26,27 +32,42 @@ export function buildTiles(layout: PosterLayout, projection: Projection): Tile[]
         height: layout.usable.height,
       };
 
-      const overlapRect = intersect(posterRect, destination);
+      // A primeira coluna e a primeira linha encostam na borda do pôster: não há folha
+      // atrás delas para receber a aba, e nenhum milímetro é sacrificado.
+      const aba = {
+        x: col > 0 ? layout.overlap : 0,
+        y: row > 0 ? layout.overlap : 0,
+      };
+
+      const arte: Rect = {
+        x: posterRect.x + aba.x,
+        y: posterRect.y + aba.y,
+        width: posterRect.width - aba.x,
+        height: posterRect.height - aba.y,
+      };
+
+      const visivel = intersect(arte, destination);
 
       tiles.push({
         index: row * layout.cols + col,
         col,
         row,
         posterRect,
-        source: overlapRect
+        aba,
+        source: visivel
           ? {
-              x: source.x + (overlapRect.x - destination.x) * scaleX,
-              y: source.y + (overlapRect.y - destination.y) * scaleY,
-              width: overlapRect.width * scaleX,
-              height: overlapRect.height * scaleY,
+              x: source.x + (visivel.x - destination.x) * scaleX,
+              y: source.y + (visivel.y - destination.y) * scaleY,
+              width: visivel.width * scaleX,
+              height: visivel.height * scaleY,
             }
           : null,
-        dest: overlapRect
+        dest: visivel
           ? {
-              x: overlapRect.x - posterRect.x,
-              y: overlapRect.y - posterRect.y,
-              width: overlapRect.width,
-              height: overlapRect.height,
+              x: visivel.x - posterRect.x,
+              y: visivel.y - posterRect.y,
+              width: visivel.width,
+              height: visivel.height,
             }
           : null,
       });

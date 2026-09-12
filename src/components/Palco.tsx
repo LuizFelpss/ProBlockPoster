@@ -13,8 +13,8 @@ interface PalcoProps {
  * Preview da divisão (req. 3.5).
  *
  * As folhas ficam exatamente onde estarão no pôster montado: quem sobrepõe, sobrepõe
- * de verdade, e a folha seguinte cobre a anterior como na montagem. Um preview com
- * espaçamento decorativo entre folhas mentiria sobre o resultado.
+ * de verdade, e a folha anterior cobre a aba de cola da seguinte como na montagem. Um
+ * preview com espaçamento decorativo entre folhas mentiria sobre o resultado.
  */
 export default function Palco({ layout, tiles, projection, image, imageUrl, chave }: PalcoProps) {
   const { poster, usable, overlap, step, cols, rows } = layout;
@@ -57,7 +57,9 @@ export default function Palco({ layout, tiles, projection, image, imageUrl, chav
             top: pct(tile.posterRect.y, poster.height),
             width: pct(usable.width, poster.width),
             height: pct(usable.height, poster.height),
-            zIndex: tile.index + 1,
+            // Ordem invertida: a aba de cola de cada folha desaparece por baixo da
+            // vizinha anterior, que é justamente como as folhas se encaixam no papel.
+            zIndex: tiles.length - tile.index,
           }}
         >
           <img
@@ -72,6 +74,18 @@ export default function Palco({ layout, tiles, projection, image, imageUrl, chav
               height: pct(imagemNoPoster.height, usable.height),
             }}
           />
+          {tile.aba.x > 0 && (
+            <span
+              className="aba absolute inset-y-0 left-0"
+              style={{ width: pct(tile.aba.x, usable.width) }}
+            />
+          )}
+          {tile.aba.y > 0 && (
+            <span
+              className="aba absolute inset-x-0 top-0"
+              style={{ height: pct(tile.aba.y, usable.height) }}
+            />
+          )}
           <span className="folha-numero numero">{tile.index + 1}</span>
         </div>
       ))}

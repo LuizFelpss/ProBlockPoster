@@ -76,6 +76,12 @@ export interface Tile {
   row: number;
   /** Posição desta folha dentro do pôster, em mm. */
   posterRect: Rect;
+  /**
+   * Aba de cola: faixa branca em mm nas bordas esquerda e superior, que entra por baixo
+   * da folha vizinha na montagem. Vale `overlap` quando há vizinha atrás naquele eixo e
+   * 0 quando a folha encosta na borda do pôster.
+   */
+  aba: { x: number; y: number };
   /** Região da imagem a desenhar, em px. `null` quando a folha fica em branco (modo ajustar). */
   source: Rect | null;
   /** Onde desenhar dentro da área imprimível da folha, em mm a partir do canto da margem. */

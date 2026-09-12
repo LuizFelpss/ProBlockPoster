@@ -211,7 +211,8 @@ function drawCoverSheet(doc: jsPDF, layout: PosterLayout, options: PdfOptions): 
   y += 5;
   doc.text(
     overlap > 0
-      ? `Cada folha repete ${overlap} mm da vizinha, para você alinhar na hora de colar.`
+      ? `Cada folha traz uma faixa branca de ${overlap} mm na borda esquerda e no topo: ` +
+          'é a aba de cola, que entra por baixo da folha vizinha.'
       : 'As folhas se encostam sem repetir nada: recorte com precisão.',
     margin,
     y,
@@ -252,7 +253,7 @@ function drawCoverSheet(doc: jsPDF, layout: PosterLayout, options: PdfOptions): 
     'Confira a régua abaixo antes de imprimir tudo.',
     'Recorte pelas marcas de corte.',
     overlap > 0
-      ? `Sobreponha ${overlap} mm entre folhas vizinhas.`
+      ? `Deslize a faixa branca de ${overlap} mm por baixo da vizinha até a arte encostar.`
       : 'Encoste as folhas sem sobrepor.',
     'Monte na ordem numerada, da esquerda para a direita.',
   ];

@@ -324,7 +324,7 @@ function Rodape({ largura, altura, folhas, colunas, linhas, sobreposicao, alvo }
         <li>Meça a régua da folha de montagem antes de imprimir o resto.</li>
         <li>
           {sobreposicao > 0
-            ? `Recorte pelas marcas e sobreponha ${sobreposicao} mm entre folhas.`
+            ? `Recorte pelas marcas e deslize a aba branca de ${sobreposicao} mm por baixo da vizinha.`
             : 'Recorte pelas marcas e encoste as folhas sem sobrepor.'}
         </li>
       </ol>

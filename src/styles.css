@@ -225,6 +225,16 @@
     color: var(--color-tinta-escura);
   }
 
+  /*
+    A aba de cola: a folha realmente sai em branco aqui, e some por baixo da vizinha.
+    Fica no preview para uma folha isolada não fingir ter arte até a borda.
+  */
+  .aba {
+    position: absolute;
+    background: var(--color-papel);
+    pointer-events: none;
+  }
+
   /* A faixa repetida entre folhas: a única coisa na tela que grita. */
   .registro {
     position: absolute;
